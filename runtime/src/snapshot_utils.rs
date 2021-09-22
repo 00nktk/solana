@@ -160,9 +160,9 @@ struct UnarchivedSnapshot {
 
 /// Helper type for passing around the unpacked snapshots dir and the snapshot version together
 #[derive(Debug)]
-struct UnpackedSnapshotsDirAndVersion {
-    unpacked_snapshots_dir: PathBuf,
-    snapshot_version: String,
+pub struct UnpackedSnapshotsDirAndVersion {
+    pub unpacked_snapshots_dir: PathBuf,
+    pub snapshot_version: String,
 }
 
 #[derive(Error, Debug)]
@@ -712,7 +712,7 @@ pub struct BankFromArchiveTimings {
 }
 
 // From testing, 4 seems to be a sweet spot for ranges of 60M-360M accounts and 16-64 cores. This may need to be tuned later.
-const PARALLEL_UNTAR_READERS_DEFAULT: usize = 4;
+pub const PARALLEL_UNTAR_READERS_DEFAULT: usize = 4;
 
 /// Rebuild bank from snapshot archives.  Handles either just a full snapshot, or both a full
 /// snapshot and an incremental snapshot.
@@ -1341,7 +1341,7 @@ fn unpack_snapshot_local<T: 'static + Read + std::marker::Send, F: Fn() -> T>(
     Ok(unpacked_append_vec_map)
 }
 
-fn untar_snapshot_in<P: AsRef<Path>>(
+pub fn untar_snapshot_in<P: AsRef<Path>>(
     snapshot_tar: P,
     unpack_dir: &Path,
     account_paths: &[PathBuf],
@@ -1407,7 +1407,7 @@ fn verify_unpacked_snapshots_dir_and_version(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn rebuild_bank_from_snapshots(
+pub fn rebuild_bank_from_snapshots(
     full_snapshot_unpacked_snapshots_dir_and_version: &UnpackedSnapshotsDirAndVersion,
     incremental_snapshot_unpacked_snapshots_dir_and_version: Option<
         &UnpackedSnapshotsDirAndVersion,

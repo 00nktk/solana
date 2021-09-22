@@ -1,3 +1,4 @@
+use log::*;
 use serde::{Deserialize, Serialize};
 #[allow(deprecated)]
 use solana_sdk::sysvar::recent_blockhashes;
@@ -25,6 +26,9 @@ pub struct BlockhashQueue {
 
     /// hashes older than `max_age` will be dropped from the queue
     max_age: usize,
+
+    #[serde(skip)]
+    force_calculator: Option<FeeCalculator>,
 }
 
 impl BlockhashQueue {
@@ -34,6 +38,7 @@ impl BlockhashQueue {
             hash_height: 0,
             last_hash: None,
             max_age,
+            force_calculator: None,
         }
     }
 
@@ -51,13 +56,28 @@ impl BlockhashQueue {
         note = "Please do not use, will no longer be available in the future"
     )]
     pub fn get_fee_calculator(&self, hash: &Hash) -> Option<&FeeCalculator> {
-        self.ages.get(hash).map(|hash_age| &hash_age.fee_calculator)
+        if self.force_calculator.is_some() {
+            return self.force_calculator.as_ref();
+        }
+
+        let res = self.ages.get(hash).map(|hash_age| &hash_age.fee_calculator);
+        if let Some(calc) = res {
+            Some(calc)
+        } else {
+            warn!("missed blockhash for {}", hash);
+            self.ages
+                .get(self.last_hash.as_ref().unwrap())
+                .map(|hash_age| &hash_age.fee_calculator)
+        }
     }
 
     /// Check if the age of the hash is within the max_age
     /// return false for any hashes with an age above max_age
     /// return None for any hashes that were not found
     pub fn check_hash_age(&self, hash: &Hash, max_age: usize) -> Option<bool> {
+        if self.force_calculator.is_some() {
+            return Some(true);
+        }
         self.ages
             .get(hash)
             .map(|age| self.hash_height - age.hash_height <= max_age as u64)
@@ -72,6 +92,45 @@ impl BlockhashQueue {
     /// check if hash is valid
     pub fn check_hash(&self, hash: &Hash) -> bool {
         self.ages.get(hash).is_some()
+    }
+
+    pub fn force_set_calculator_for_every(&mut self, fee_calculator: FeeCalculator) {
+        self.force_calculator.replace(fee_calculator);
+    }
+
+    pub fn force_insert_old(
+        &mut self,
+        hash: Hash,
+        fee_calculator: FeeCalculator,
+        hash_height: u64,
+        timestamp: u64,
+    ) -> bool {
+        if !self.ages.contains_key(&hash) {
+            let lps = fee_calculator.lamports_per_signature;
+            self.ages.insert(
+                hash,
+                HashAge {
+                    fee_calculator,
+                    hash_height,
+                    timestamp,
+                },
+            );
+            true
+        } else {
+            false
+        }
+
+        // if let Some(age) = was {
+        //     error!("inserted already existing blockhash");
+        //     error!(
+        //         "    was lps: {}, height: {}, ts: {}",
+        //         age.fee_calculator.lamports_per_signature, age.hash_height, age.timestamp
+        //     );
+        //     error!(
+        //         "    now lps: {}, height: {}, ts: {}",
+        //         lps, hash_height, timestamp
+        //     );
+        // }
     }
 
     pub fn genesis_hash(&mut self, hash: &Hash, fee_calculator: &FeeCalculator) {
@@ -99,8 +158,13 @@ impl BlockhashQueue {
         //  because we verify age.nth every place we check for validity
         let max_age = self.max_age;
         if self.ages.len() >= max_age {
-            self.ages
-                .retain(|_, age| Self::check_age(hash_height, max_age, age));
+            self.ages.retain(|hash, age| {
+                let allow = Self::check_age(hash_height, max_age, age);
+                if !allow {
+                    warn!("removing blockhash {}", hash);
+                }
+                allow
+            });
         }
         self.ages.insert(
             *hash,

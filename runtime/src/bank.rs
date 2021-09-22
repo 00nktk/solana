@@ -840,7 +840,7 @@ pub struct Bank {
     pub src: StatusCacheRc,
 
     /// FIFO queue of `recent_blockhash` items
-    blockhash_queue: RwLock<BlockhashQueue>,
+    pub blockhash_queue: RwLock<BlockhashQueue>,
 
     /// The set of parents including this bank
     pub ancestors: Ancestors,
@@ -943,12 +943,12 @@ pub struct Bank {
 
     /// A boolean reflecting whether any entries were recorded into the PoH
     /// stream for the slot == self.slot
-    is_delta: AtomicBool,
+    pub is_delta: AtomicBool,
 
     /// The InstructionProcessor
-    instruction_processor: InstructionProcessor,
+    pub instruction_processor: InstructionProcessor,
 
-    compute_budget: Option<ComputeBudget>,
+    pub compute_budget: Option<ComputeBudget>,
 
     /// Builtin programs activated dynamically by feature
     #[allow(clippy::rc_buffer)]
@@ -3163,7 +3163,7 @@ impl Bank {
 
     /// Converts Accounts into RefCell<AccountSharedData>, this involves moving
     /// ownership by draining the source
-    fn accounts_to_refcells(accounts: &mut TransactionAccounts) -> TransactionAccountRefCells {
+    pub fn accounts_to_refcells(accounts: &mut TransactionAccounts) -> TransactionAccountRefCells {
         let account_refcells: Vec<_> = accounts
             .drain(..)
             .map(|(pubkey, account)| (pubkey, Rc::new(RefCell::new(account))))
@@ -3173,7 +3173,7 @@ impl Bank {
 
     /// Converts back from RefCell<AccountSharedData> to AccountSharedData, this involves moving
     /// ownership by draining the sources
-    fn refcells_to_accounts(
+    pub fn refcells_to_accounts(
         accounts: &mut TransactionAccounts,
         mut account_refcells: TransactionAccountRefCells,
     ) -> std::result::Result<(), TransactionError> {
@@ -3208,7 +3208,7 @@ impl Bank {
     }
 
     /// Get any cached executors needed by the transaction
-    fn get_executors(
+    pub fn get_executors(
         &self,
         message: &SanitizedMessage,
         accounts: &[(Pubkey, AccountSharedData)],
@@ -3243,7 +3243,7 @@ impl Bank {
     }
 
     /// Add executors back to the bank's cache if modified
-    fn update_executors(&self, executors: Rc<RefCell<Executors>>) {
+    pub fn update_executors(&self, executors: Rc<RefCell<Executors>>) {
         let executors = executors.borrow();
         if executors.is_dirty {
             let mut cow_cache = self.cached_executors.write().unwrap();
@@ -3838,7 +3838,7 @@ impl Bank {
         self.distribute_rent_to_validators(&self.vote_accounts(), rent_to_be_distributed);
     }
 
-    fn collect_rent(
+    pub fn collect_rent(
         &self,
         res: &[TransactionExecutionResult],
         loaded_txs: &mut [TransactionLoadResult],
@@ -4523,7 +4523,7 @@ impl Bank {
         self.store_account(pubkey, new_account);
     }
 
-    fn withdraw(&self, pubkey: &Pubkey, lamports: u64) -> Result<()> {
+    pub fn withdraw(&self, pubkey: &Pubkey, lamports: u64) -> Result<()> {
         match self.get_account_with_fixed_root(pubkey) {
             Some(mut account) => {
                 let min_balance = match get_system_account_kind(&account) {
@@ -5707,7 +5707,7 @@ impl Bank {
         }
     }
 
-    fn rent_for_sysvars(&self) -> bool {
+    pub fn rent_for_sysvars(&self) -> bool {
         self.feature_set
             .is_active(&feature_set::rent_for_sysvars::id())
     }
